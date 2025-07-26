@@ -1,0 +1,9 @@
+---
+description: "We're building a project called HireScore, an AI-powered HR tool designed to streamline the hiring process for small and medium-sized businesses (SMEs). Employers can post jobs by entering a job title and description. Candidates can apply by submitting their resume, and optionally their GitHub profile, personal website, or cover letter. Once a candidate applies, we send the provided data to the OpenAI ChatGPT API using a custom base prompt.
+
+The AI evaluates each input individually (resume, GitHub, website, and cover letter) and returns a score for each (0–100), an overall fit score, and structured feedback including top strengths, areas for improvement, and actionable tips. The platform is designed to be bias-free, meaning it does not use or consider demographic information such as name, age, gender, or location in the scoring process.
+
+We're using Next.js (full-stack) with PostgreSQL (via Prisma) for the database, BetterAuth for authentication, and TailwindCSS for styling. Our MVP goal is to build a flow where authenticated users can post jobs, candidates can apply, and employers can view a dashboard showing scored, ranked applications with insights — all in a streamlined, privacy-conscious way"
+globs:
+alwaysApply: false
+---
