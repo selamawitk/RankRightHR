@@ -49,12 +49,12 @@ AI: OpenAI API
 
 Auth: BetterAuth (or mock login system for demo)
 
-📸 Screenshots (optional)
+Screenshots (optional)
 Job Posting → Application → AI Results view (add here if available).
  How to Run Locally
 
 # Clone the repository
-git clone https://github.com/your-repo/job-matcher-app
+git clone (https://github.com/selamawitk/RankRightHR)
 
 # Install dependencies
 cd client && npm install
