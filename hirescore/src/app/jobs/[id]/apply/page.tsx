@@ -19,7 +19,7 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import { pdfToText } from "react-pdftotext";
+import pdfToText from "react-pdftotext";
 
 interface Job {
   id: string;
