@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    response.cookies.set("session-token", sessionToken, {
+    response.cookies.set("auth-token", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

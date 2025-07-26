@@ -19,6 +19,7 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
+import { pdfToText } from "react-pdftotext";
 
 interface Job {
   id: string;
@@ -141,10 +142,45 @@ export default function ApplyJobPage({
       setFormData((prev) => ({ ...prev, resumeFile: file }));
       setError("");
 
-      // Extract text from file (basic implementation)
-      if (file.type === "text/plain") {
-        const text = await file.text();
-        setFormData((prev) => ({ ...prev, resumeText: text }));
+      // Extract text from file based on type
+      try {
+        if (file.type === "application/pdf") {
+          console.log("📄 Extracting text from PDF...");
+          setEvaluationStatus("Extracting text from PDF...");
+
+          const text = await pdfToText(file);
+          console.log("✅ PDF text extracted, length:", text.length);
+
+          if (text.trim().length > 0) {
+            setFormData((prev) => ({
+              ...prev,
+              resumeText: text.trim(),
+            }));
+            setEvaluationStatus("");
+          } else {
+            console.log("⚠️ PDF text extraction returned empty content");
+            setFormData((prev) => ({ ...prev, resumeText: "" }));
+            setEvaluationStatus("");
+          }
+        } else if (file.type === "text/plain") {
+          // Handle plain text files
+          const text = await file.text();
+          setFormData((prev) => ({ ...prev, resumeText: text }));
+        } else {
+          // For DOC/DOCX files, we'll rely on the structured content generation
+          console.log(
+            "📝 Word document uploaded, will use structured content for AI"
+          );
+          setFormData((prev) => ({ ...prev, resumeText: "" }));
+        }
+      } catch (extractionError) {
+        console.error("❌ Error extracting text from file:", extractionError);
+        setError(
+          "Could not extract text from file. You can still submit the application."
+        );
+        setEvaluationStatus("");
+        // Don't block submission, just continue without extracted text
+        setFormData((prev) => ({ ...prev, resumeText: "" }));
       }
     }
   };

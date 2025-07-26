@@ -30,11 +30,25 @@ export interface CVEvaluationResult {
 export async function evaluateCV(
   data: CVEvaluationData
 ): Promise<CVEvaluationResult> {
-  console.log('Starting CV evaluation with Gemini...');
+  console.log('🤖 Starting CV evaluation with Gemini...');
+  console.log('📋 Job Title:', data.jobTitle);
+  console.log('📄 Resume Text Length:', data.resumeText?.length || 0, 'characters');
+  console.log('💌 Cover Letter:', data.coverLetter ? 'Provided' : 'Not provided');
   
   try {
     if (!apiKey) {
       throw new Error('Gemini API key not configured');
+    }
+
+    // Validate input data
+    if (!data.resumeText || data.resumeText.trim().length < 10) {
+      console.error('❌ Invalid resume text - too short or empty');
+      throw new Error('Resume text is too short or empty');
+    }
+
+    if (!data.jobTitle || !data.jobDescription) {
+      console.error('❌ Missing job title or description');
+      throw new Error('Job title and description are required');
     }
 
     const model = genAI.getGenerativeModel({ 
@@ -56,6 +70,20 @@ You are an AI hiring assistant designed to evaluate job applications fairly and 
 - Focus solely on professional qualifications, skills, experience, and job fit
 - Do not consider or mention: name, age, gender, race, location, or any demographic information
 - Provide constructive and actionable feedback
+- be as objective as possible
+- be as detailed as possible
+- be as specific as possible
+- be as helpful as possible
+- be as actionable as possible
+- be as concise as possible
+- be as clear as possible
+- do not be too positive
+- do not be too negative
+- do not be too subjective
+- do not be too objective
+- do not be too general
+- do not be too specific
+- do not be too general
 
 **JOB INFORMATION:**
 Position: ${data.jobTitle}
@@ -104,12 +132,12 @@ Please provide your evaluation in the following JSON format:
 Provide only valid JSON, no additional text.
 `;
 
-    console.log('Sending request to Gemini API...');
+    console.log('📤 Sending request to Gemini API...');
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('Received response from Gemini:', text.substring(0, 200) + '...');
+    console.log('📥 Received response from Gemini (first 200 chars):', text.substring(0, 200) + '...');
 
     // Clean the response text to remove any markdown formatting or extra text
     let cleanedText = text.trim();
@@ -117,14 +145,17 @@ Provide only valid JSON, no additional text.
     // Remove markdown code blocks if present
     if (cleanedText.startsWith('```json')) {
       cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      console.log('🧹 Removed JSON markdown blocks');
     } else if (cleanedText.startsWith('```')) {
       cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      console.log('🧹 Removed generic markdown blocks');
     }
     
     // Find JSON object in the response
     const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       cleanedText = jsonMatch[0];
+      console.log('🎯 Extracted JSON from response');
     }
 
     // Parse the JSON response
@@ -132,11 +163,13 @@ Provide only valid JSON, no additional text.
 
     try {
       evaluationResult = JSON.parse(cleanedText);
-      console.log('Successfully parsed Gemini response');
+      console.log('✅ Successfully parsed Gemini response');
     } catch (parseError) {
-      console.error("Failed to parse Gemini response:", cleanedText);
+      console.error("❌ Failed to parse Gemini response");
+      console.error("Raw response:", text);
+      console.error("Cleaned text:", cleanedText);
       console.error("Parse error:", parseError);
-      throw new Error("Invalid response format from AI");
+      throw new Error("Invalid response format from AI - could not parse JSON");
     }
 
     // Validate the response structure
@@ -148,8 +181,8 @@ Provide only valid JSON, no additional text.
       !Array.isArray(evaluationResult.tips) ||
       typeof evaluationResult.feedback !== "string"
     ) {
-      console.error("Invalid response structure:", evaluationResult);
-      throw new Error("Invalid response structure from AI");
+      console.error("❌ Invalid response structure from Gemini:", evaluationResult);
+      throw new Error("Invalid response structure from AI - missing required fields");
     }
 
     // Ensure scores are within valid range (0-10)
@@ -172,15 +205,20 @@ Provide only valid JSON, no additional text.
       );
     }
 
-    console.log('CV evaluation completed successfully:', {
+    console.log('🎉 CV evaluation completed successfully:', {
       resumeScore: evaluationResult.resumeScore,
       coverLetterScore: evaluationResult.coverLetterScore,
-      overallScore: evaluationResult.overallScore
+      overallScore: evaluationResult.overallScore,
+      feedbackLength: evaluationResult.feedback.length
     });
 
     return evaluationResult;
   } catch (error) {
-    console.error("Error evaluating CV with Gemini:", error);
+    console.error("❌ Error evaluating CV with Gemini:", error);
+    console.error("Error details:", {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
 
     // Return fallback scores if Gemini fails
     const fallbackResult: CVEvaluationResult = {
@@ -188,24 +226,24 @@ Provide only valid JSON, no additional text.
       coverLetterScore: data.coverLetter ? 6 : undefined,
       overallScore: 6,
       strengths: [
-        "Application received and processed",
+        "Application received and processed successfully",
         "Candidate shows interest in the position",
-        "Basic qualifications appear to be met",
+        "Resume provided for review",
       ],
       improvements: [
-        "Detailed evaluation unavailable due to technical issues",
-        "Manual review recommended",
+        "AI evaluation temporarily unavailable",
+        "Manual review by hiring team recommended",
       ],
       tips: [
         "Consider scheduling an interview for detailed assessment",
-        "Review application materials manually",
-        "Follow up with candidate for additional information",
+        "Review application materials manually for full evaluation",
+        "Contact candidate directly for any clarifications needed",
       ],
       feedback:
-        "Automatic evaluation was not successful. This application requires manual review by the hiring team to properly assess the candidate's qualifications and fit for the position.",
+        "This application has been received successfully. Due to a temporary issue with our AI evaluation system, this application requires manual review by the hiring team to provide detailed feedback and scoring. The candidate's qualifications should be assessed based on the provided resume and cover letter materials.",
     };
     
-    console.log('Using fallback evaluation result');
+    console.log('⚠️ Using fallback evaluation result due to error');
     return fallbackResult;
   }
 }

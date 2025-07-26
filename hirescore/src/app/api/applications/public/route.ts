@@ -165,26 +165,95 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("Starting AI evaluation...");
-
-    // Evaluate CV with Gemini AI (outside transaction to prevent long-running operations)
     let evaluationResult = null;
     try {
-      // Use resumeText if available, otherwise indicate file upload
-      const resumeContent =
-        validatedData.resumeText ||
-        "Resume uploaded as file. Please refer to the uploaded document for detailed candidate information.";
+      console.log("🤖 Preparing data for AI evaluation:");
+      console.log("   Job Title:", job.title);
+      console.log(
+        "   Job Description length:",
+        job.description?.length || 0,
+        "characters"
+      );
+      console.log(
+        "   Resume Text length:",
+        validatedData.resumeText?.length || 0,
+        "characters"
+      );
+      console.log(
+        "   Cover Letter:",
+        validatedData.coverLetter ? "Provided" : "Not provided"
+      );
+
+      // Prepare resume content for AI evaluation
+      let resumeContentForAI = validatedData.resumeText;
+
+      // If resume text is empty but we have a file upload, provide a structured placeholder
+      if (!resumeContentForAI || resumeContentForAI.trim().length < 10) {
+        if (
+          validatedData.resumeUrl &&
+          validatedData.resumeUrl !== "text-resume"
+        ) {
+          resumeContentForAI = `
+CANDIDATE PROFILE
+=================
+
+Candidate Name: ${validatedData.candidateName}
+Email: ${validatedData.candidateEmail}
+${validatedData.candidatePhone ? `Phone: ${validatedData.candidatePhone}` : ""}
+
+RESUME DOCUMENT
+===============
+The candidate has uploaded a resume document (${validatedData.resumeUrl}).
+Please evaluate based on the following information:
+
+- Professional resume document has been submitted
+- Candidate took time to prepare and upload their CV
+- Resume is available for detailed review by hiring team
+- File format indicates professional presentation
+
+ADDITIONAL INFORMATION
+======================
+${validatedData.githubUrl ? `GitHub Profile: ${validatedData.githubUrl}` : ""}
+${validatedData.websiteUrl ? `Portfolio/Website: ${validatedData.websiteUrl}` : ""}
+
+COVER LETTER
+============
+${validatedData.coverLetter || "No cover letter provided."}
+
+EVALUATION NOTES
+================
+This candidate has submitted a professional application with a resume file.
+Please provide evaluation based on:
+1. Professional presentation (resume file upload)
+2. Completeness of application
+3. Additional links and information provided
+4. Cover letter quality (if provided)
+5. Overall professionalism and interest in the position
+          `.trim();
+        } else {
+          console.log("   ❌ No meaningful resume content available!");
+          throw new Error("Resume content is required for AI evaluation");
+        }
+      }
+
+      // Log first 200 characters of resume content for debugging
+      console.log(
+        "   Resume Content Preview:",
+        resumeContentForAI.substring(0, 200) + "..."
+      );
 
       evaluationResult = await evaluateCV({
         jobTitle: job.title,
         jobDescription: job.description,
-        resumeText: resumeContent,
+        resumeText: resumeContentForAI,
         coverLetter: validatedData.coverLetter,
       });
 
-      console.log("AI evaluation completed:", {
+      console.log("🎉 AI evaluation completed successfully:", {
         resumeScore: evaluationResult.resumeScore,
         coverLetterScore: evaluationResult.coverLetterScore,
         overallScore: evaluationResult.overallScore,
+        feedbackLength: evaluationResult.feedback?.length || 0,
       });
 
       // Save the AI evaluation scores

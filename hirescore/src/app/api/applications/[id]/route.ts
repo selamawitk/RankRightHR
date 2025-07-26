@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionFromHeaders } from "@/lib/auth";
+import { sendApplicationStatusEmail } from "@/lib/email";
 
 export async function GET(
   request: NextRequest,
@@ -126,17 +127,49 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    console.log("PATCH /api/applications/[id] - Application ID:", id);
+    console.log("🔄 PATCH /api/applications/[id] - Application ID:", id);
+
+    // Debug cookie information
+    const cookieHeader = request.headers.get("cookie");
+    console.log(
+      "🍪 PATCH /api/applications/[id] - Cookie header:",
+      cookieHeader ? "Present" : "Missing"
+    );
+
+    if (cookieHeader) {
+      const cookies = cookieHeader.split(";").reduce(
+        (acc, cookie) => {
+          const [key, value] = cookie.trim().split("=");
+          acc[key] = value ? value.substring(0, 10) + "..." : "empty"; // Only show first 10 chars for security
+          return acc;
+        },
+        {} as Record<string, string>
+      );
+      console.log("🍪 Available cookies:", Object.keys(cookies));
+    }
 
     const session = await getSessionFromHeaders(request.headers);
+    console.log(
+      "🔑 PATCH /api/applications/[id] - Session check:",
+      session ? "Valid session found" : "No valid session"
+    );
 
     if (!session) {
-      console.log("PATCH /api/applications/[id] - Unauthorized: No session");
+      console.log("❌ PATCH /api/applications/[id] - Unauthorized: No session");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    console.log(
+      "👤 PATCH /api/applications/[id] - User:",
+      session.user.email,
+      "Role:",
+      session.user.role
+    );
+
     if (session.user.role !== "EMPLOYER") {
-      console.log("PATCH /api/applications/[id] - Forbidden: Not an employer");
+      console.log(
+        "❌ PATCH /api/applications/[id] - Forbidden: Not an employer"
+      );
       return NextResponse.json(
         { error: "Only employers can update applications" },
         { status: 403 }
@@ -146,30 +179,55 @@ export async function PATCH(
     const body = await request.json();
     const { status } = body;
     console.log(
-      "PATCH /api/applications/[id] - Requested status change to:",
+      "📝 PATCH /api/applications/[id] - Requested status change to:",
       status
     );
 
-    if (
-      !status ||
-      !["PENDING", "REVIEWING", "INTERVIEWED", "HIRED", "REJECTED"].includes(
-        status
-      )
-    ) {
-      console.log("PATCH /api/applications/[id] - Invalid status:", status);
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    // Valid status options that match both frontend and database enum
+    const validStatuses = [
+      "PENDING",
+      "REVIEWING",
+      "INTERVIEWED",
+      "HIRED",
+      "REJECTED",
+    ];
+
+    if (!status || !validStatuses.includes(status)) {
+      console.log("❌ PATCH /api/applications/[id] - Invalid status:", status);
+      console.log("✅ Valid statuses are:", validStatuses);
+      return NextResponse.json(
+        {
+          error: "Invalid status",
+          validStatuses: validStatuses,
+          receivedStatus: status,
+        },
+        { status: 400 }
+      );
     }
 
-    // Verify the application belongs to a job posted by this employer
+    // Verify the application belongs to a job posted by this employer and get all details for email
     const application = await prisma.application.findUnique({
       where: { id },
       include: {
-        job: true,
+        job: {
+          include: {
+            employer: {
+              select: {
+                id: true,
+                name: true,
+                companyName: true,
+              },
+            },
+          },
+        },
       },
     });
 
     if (!application) {
-      console.log("PATCH /api/applications/[id] - Application not found:", id);
+      console.log(
+        "❌ PATCH /api/applications/[id] - Application not found:",
+        id
+      );
       return NextResponse.json(
         { error: "Application not found" },
         { status: 404 }
@@ -178,13 +236,15 @@ export async function PATCH(
 
     if (application.job.employerId !== session.user.id) {
       console.log(
-        "PATCH /api/applications/[id] - Access denied: Job belongs to different employer"
+        "❌ PATCH /api/applications/[id] - Access denied: Job belongs to different employer"
       );
+      console.log("   Application employer ID:", application.job.employerId);
+      console.log("   Session user ID:", session.user.id);
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     console.log(
-      "PATCH /api/applications/[id] - Updating application status from",
+      "🔄 PATCH /api/applications/[id] - Updating application status from",
       application.status,
       "to",
       status
@@ -193,20 +253,61 @@ export async function PATCH(
     // Update the application status
     const updatedApplication = await prisma.application.update({
       where: { id },
-      data: { status },
+      data: { status: status as any }, // Type assertion for enum
     });
 
     console.log(
-      "PATCH /api/applications/[id] - Status updated successfully:",
+      "✅ PATCH /api/applications/[id] - Status updated successfully:",
       updatedApplication.status
     );
+
+    // Send email notification to candidate (don't wait for it to complete)
+    if (application.candidateEmail && application.candidateName) {
+      console.log(
+        "📧 PATCH /api/applications/[id] - Sending email notification..."
+      );
+
+      // Send email asynchronously without blocking the response
+      sendApplicationStatusEmail({
+        candidateName: application.candidateName,
+        candidateEmail: application.candidateEmail,
+        jobTitle: application.job.title,
+        companyName:
+          application.job.employer.companyName || application.job.employer.name,
+        status: status,
+        jobId: application.jobId,
+        applicationId: application.id,
+      })
+        .then((emailSent) => {
+          if (emailSent) {
+            console.log(
+              "✅ PATCH /api/applications/[id] - Email notification sent successfully"
+            );
+          } else {
+            console.log(
+              "❌ PATCH /api/applications/[id] - Email notification failed"
+            );
+          }
+        })
+        .catch((emailError) => {
+          console.error(
+            "❌ PATCH /api/applications/[id] - Email notification error:",
+            emailError
+          );
+        });
+    } else {
+      console.log(
+        "⚠️ PATCH /api/applications/[id] - Skipping email: missing candidate details"
+      );
+    }
 
     return NextResponse.json({
       message: "Application status updated successfully",
       status: updatedApplication.status,
+      emailNotification: "Email notification sent",
     });
   } catch (error) {
-    console.error("Error updating application status:", error);
+    console.error("❌ Error updating application status:", error);
     return NextResponse.json(
       { error: "Failed to update application status" },
       { status: 500 }

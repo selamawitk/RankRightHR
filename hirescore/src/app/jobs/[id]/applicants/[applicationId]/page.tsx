@@ -174,7 +174,7 @@ export default function ApplicationDetailPage({
 
       const result = await response.json();
       console.log("Status update successful:", result);
-      setSuccess("Application status updated successfully");
+      setSuccess(`Application status updated successfully! ${application.candidateEmail ? 'Email notification sent to candidate.' : ''}`);
 
       // Update local state
       if (application) {

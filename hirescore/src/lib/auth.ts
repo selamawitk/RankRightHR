@@ -91,13 +91,17 @@ export async function getSessionFromHeaders(
   // Try to get token from cookie header
   const cookieHeader = headers.get("cookie");
   if (cookieHeader) {
-    const cookies = cookieHeader.split(";").reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split("=");
-      acc[key] = value;
-      return acc;
-    }, {} as Record<string, string>);
+    const cookies = cookieHeader.split(";").reduce(
+      (acc, cookie) => {
+        const [key, value] = cookie.trim().split("=");
+        acc[key] = value;
+        return acc;
+      },
+      {} as Record<string, string>
+    );
 
-    const token = cookies["auth-token"];
+    // Check for both possible cookie names
+    const token = cookies["auth-token"] || cookies["session-token"];
     if (token) {
       return verifySession(token);
     }
