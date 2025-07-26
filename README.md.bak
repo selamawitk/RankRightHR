@@ -1,0 +1,246 @@
+# HireScore - AI-Powered HR Platform
+
+HireScore is an AI-powered HR tool designed to streamline the hiring process for small and medium-sized businesses (SMEs). Employers can post jobs and candidates can apply with their resumes, with AI-powered scoring to help match the best candidates.
+
+## Features
+
+- **User Authentication**: Secure login and signup for employers and candidates
+- **Role-based Access**: Different interfaces for employers and candidates
+- **Modern UI**: Built with React, Vite, and shadcn/ui components
+- **Type-safe Backend**: Express.js with TypeScript and Prisma ORM
+- **Database**: PostgreSQL for reliable data storage
+
+## Tech Stack
+
+### Frontend
+- React 18+ with TypeScript
+- Vite for fast development
+- Tailwind CSS for styling
+- shadcn/ui components
+- React Router for navigation
+- Axios for API calls
+
+### Backend
+- Express.js with TypeScript
+- Prisma ORM
+- PostgreSQL database
+- JWT authentication
+- bcrypt for password hashing
+- Zod for validation
+
+## Prerequisites
+
+Before running this project, make sure you have the following installed:
+
+- Node.js (v18 or higher)
+- npm or yarn
+- PostgreSQL (v12 or higher)
+
+## Setup Instructions
+
+### 1. Clone and Install Dependencies
+
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd RankRightHR
+
+# Install backend dependencies
+cd backend
+npm install
+
+# Install frontend dependencies
+cd ../frontend
+npm install
+```
+
+### 2. Database Setup
+
+1. **Install PostgreSQL** (if not already installed):
+   - **macOS**: `brew install postgresql`
+   - **Ubuntu**: `sudo apt-get install postgresql postgresql-contrib`
+   - **Windows**: Download from [postgresql.org](https://www.postgresql.org/download/)
+
+2. **Start PostgreSQL service**:
+   - **macOS**: `brew services start postgresql`
+   - **Ubuntu**: `sudo systemctl start postgresql`
+   - **Windows**: Start from Services or pgAdmin
+
+3. **Create database and user**:
+   ```bash
+   # Connect to PostgreSQL
+   psql postgres
+   
+   # Create database
+   CREATE DATABASE hirescore_db;
+   
+   # Create user
+   CREATE USER hirescore WITH PASSWORD 'password';
+   
+   # Grant privileges
+   GRANT ALL PRIVILEGES ON DATABASE hirescore_db TO hirescore;
+   
+   # Exit
+   \q
+   ```
+
+### 3. Environment Configuration
+
+Create environment files for the backend:
+
+```bash
+cd backend
+
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env file with your database credentials
+# DATABASE_URL="postgresql://hirescore:password@localhost:5432/hirescore_db"
+# JWT_SECRET="your-super-secret-jwt-key"
+# PORT=5000
+# NODE_ENV=development
+# CORS_ORIGIN="http://localhost:5173"
+```
+
+### 4. Database Migration
+
+```bash
+cd backend
+
+# Generate Prisma client
+npm run db:generate
+
+# Push database schema
+npm run db:push
+
+# Optional: Open Prisma Studio to view database
+npm run db:studio
+```
+
+### 5. Start Development Servers
+
+Open two terminal windows:
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+npm run dev
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+The application will be available at:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:5000
+
+## Usage
+
+### For Employers
+
+1. **Sign Up**: Create an account with role "Employer"
+2. **Login**: Access your dashboard
+3. **Post Jobs**: Create job listings (coming soon)
+4. **Review Applications**: Manage candidate applications (coming soon)
+
+### For Candidates
+
+1. **Sign Up**: Create an account with role "Candidate"
+2. **Login**: Access your dashboard
+3. **Browse Jobs**: Find available positions (coming soon)
+4. **Apply**: Submit applications with resume (coming soon)
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/signup` - User registration
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Get current user profile
+
+### Health Check
+- `GET /api/health` - API health status
+
+## Database Schema
+
+### User Model
+```prisma
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  role      UserRole @default(EMPLOYER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  EMPLOYER
+  CANDIDATE
+  ADMIN
+}
+```
+
+## Development
+
+### Backend Scripts
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run db:generate` - Generate Prisma client
+- `npm run db:push` - Push schema to database
+- `npm run db:migrate` - Run database migrations
+- `npm run db:studio` - Open Prisma Studio
+
+### Frontend Scripts
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Error**
+   - Check if PostgreSQL is running
+   - Verify database credentials in `.env`
+   - Ensure database `hirescore_db` exists
+
+2. **Frontend Build Errors**
+   - Clear node_modules and reinstall: `rm -rf node_modules package-lock.json && npm install`
+   - Check Node.js version compatibility
+
+3. **Authentication Issues**
+   - Verify JWT_SECRET is set in backend `.env`
+   - Check if backend server is running on correct port
+
+4. **CORS Errors**
+   - Ensure CORS_ORIGIN in backend `.env` matches frontend URL
+   - Check if both servers are running
+
+### Reset Database
+```bash
+cd backend
+npm run db:push --force-reset
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+This project is licensed under the ISC License.
+
+## Support
+
+If you encounter any issues or have questions, please create an issue in the repository. 

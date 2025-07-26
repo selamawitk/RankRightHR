@@ -1,0 +1,185 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String?
+  name        String?
+  companyName String? // For employers
+  role        UserRole @default(EMPLOYER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  jobs         Job[]
+  applications Application[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  title        String
+  description  String
+  requirements String?
+  location     String?
+  salary       String?
+  type         JobType   @default(FULL_TIME)
+  status       JobStatus @default(ACTIVE)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  employerId   String
+
+  // Relations
+  employer     User          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  applications Application[]
+  questions    JobQuestion[] // Custom questions for this job
+
+  @@map("jobs")
+}
+
+model JobQuestion {
+  id       String       @id @default(cuid())
+  jobId    String
+  question String
+  type     QuestionType @default(TEXT)
+  required Boolean      @default(false)
+  options  String? // JSON string for multiple choice questions
+  order    Int          @default(0)
+
+  // Relations
+  job     Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  answers JobQuestionAnswer[]
+
+  @@map("job_questions")
+}
+
+model Application {
+  id          String  @id @default(cuid())
+  candidateId String? // Make optional for non-authenticated applications
+  jobId       String
+
+  // Candidate information for non-authenticated applications
+  candidateName  String?
+  candidateEmail String?
+  candidatePhone String?
+
+  resumeUrl   String
+  resumeText  String? // Parsed CV content
+  githubUrl   String?
+  websiteUrl  String?
+  coverLetter String?
+  status      ApplicationStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  candidate User?               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  scores    Score?
+  answers   JobQuestionAnswer[] // Answers to custom questions
+
+  @@map("applications")
+}
+
+model JobQuestionAnswer {
+  id            String @id @default(cuid())
+  applicationId String
+  questionId    String
+  answer        String
+
+  // Relations
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  question    JobQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, questionId])
+  @@map("job_question_answers")
+}
+
+model Score {
+  id            String @id @default(cuid())
+  applicationId String @unique
+
+  // Individual scores (0-10 for new system)
+  resumeScore      Int?
+  coverLetterScore Int?
+
+  // Overall score (0-10)
+  overallScore Int
+
+  // AI feedback
+  strengths    String // JSON string for SQLite compatibility
+  improvements String // JSON string for SQLite compatibility
+  tips         String // JSON string for SQLite compatibility
+
+  // Detailed evaluation
+  feedback String? // Detailed AI feedback
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("scores")
+}
+
+enum UserRole {
+  EMPLOYER
+  CANDIDATE
+  ADMIN
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  FREELANCE
+  INTERNSHIP
+}
+
+enum JobStatus {
+  ACTIVE
+  CLOSED
+  DRAFT
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  SHORTLISTED
+  REJECTED
+  HIRED
+}
+
+enum QuestionType {
+  TEXT
+  TEXTAREA
+  MULTIPLE_CHOICE
+  YES_NO
+  NUMBER
+}

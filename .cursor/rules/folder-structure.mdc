@@ -1,0 +1,5 @@
+---
+description: the structure is a monorepo with both frontend and backend in the same folder
+globs:
+alwaysApply: false
+---
