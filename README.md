@@ -1,10 +1,12 @@
 AI-Powered Job Matcher
+
 An intelligent job application and evaluation platform built in just 5 hours using React, Express, Prisma, and OpenAI.
 
  Overview
 This app streamlines hiring by allowing recruiters to post jobs, candidates to apply, and AI to instantly evaluate applications. Designed for fast prototyping and clarity in functionality.
 
-🕔 5-Hour Hackathon Plan
+5-Hour Hackathon Plan
+
 Time	Task Description
 0–1 hr	Set up authentication, protected routes, and basic navigation.
 1–2 hr	Build Job Post form and Job Listings page (CRUD).
@@ -12,7 +14,8 @@ Time	Task Description
 3–4 hr	Connect OpenAI API for candidate evaluation and scoring logic.
 4–5 hr	Render results, polish UI, test end-to-end functionality.
 
-⚙ Features
+Features
+
 Authentication & Routing
 Integrated BetterAuth (or placeholder) for login and protected pages.
 
