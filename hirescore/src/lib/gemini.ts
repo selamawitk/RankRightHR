@@ -1,7 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Gemini AI with the provided API key
-const genAI = new GoogleGenerativeAI("AIzaSyDgT7F6M-_PtfXMcM4ZY2HRJhTUskyBCHc");
+// Initialize Gemini AI with the API key from environment variables
+const apiKey = process.env.GEMINI_API_KEY || "AIzaSyDgT7F6M-_PtfXMcM4ZY2HRJhTUskyBCHc";
+
+// Validate API key
+if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+  console.warn('Gemini API key not properly configured. Using fallback evaluation.');
+}
+
+const genAI = new GoogleGenerativeAI(apiKey);
 
 export interface CVEvaluationData {
   jobTitle: string;
@@ -23,8 +30,22 @@ export interface CVEvaluationResult {
 export async function evaluateCV(
   data: CVEvaluationData
 ): Promise<CVEvaluationResult> {
+  console.log('Starting CV evaluation with Gemini...');
+  
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    if (!apiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        topK: 1,
+        topP: 1,
+        maxOutputTokens: 2048,
+      },
+    });
 
     const prompt = `
 You are an AI hiring assistant designed to evaluate job applications fairly and objectively. 
@@ -83,17 +104,38 @@ Please provide your evaluation in the following JSON format:
 Provide only valid JSON, no additional text.
 `;
 
+    console.log('Sending request to Gemini API...');
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    
+    console.log('Received response from Gemini:', text.substring(0, 200) + '...');
+
+    // Clean the response text to remove any markdown formatting or extra text
+    let cleanedText = text.trim();
+    
+    // Remove markdown code blocks if present
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    
+    // Find JSON object in the response
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedText = jsonMatch[0];
+    }
 
     // Parse the JSON response
     let evaluationResult: CVEvaluationResult;
 
     try {
-      evaluationResult = JSON.parse(text);
+      evaluationResult = JSON.parse(cleanedText);
+      console.log('Successfully parsed Gemini response');
     } catch (parseError) {
-      console.error("Failed to parse Gemini response:", text);
+      console.error("Failed to parse Gemini response:", cleanedText);
+      console.error("Parse error:", parseError);
       throw new Error("Invalid response format from AI");
     }
 
@@ -103,19 +145,21 @@ Provide only valid JSON, no additional text.
       typeof evaluationResult.overallScore !== "number" ||
       !Array.isArray(evaluationResult.strengths) ||
       !Array.isArray(evaluationResult.improvements) ||
-      !Array.isArray(evaluationResult.tips)
+      !Array.isArray(evaluationResult.tips) ||
+      typeof evaluationResult.feedback !== "string"
     ) {
+      console.error("Invalid response structure:", evaluationResult);
       throw new Error("Invalid response structure from AI");
     }
 
     // Ensure scores are within valid range (0-10)
     evaluationResult.resumeScore = Math.max(
       0,
-      Math.min(10, evaluationResult.resumeScore)
+      Math.min(10, Math.round(evaluationResult.resumeScore))
     );
     evaluationResult.overallScore = Math.max(
       0,
-      Math.min(10, evaluationResult.overallScore)
+      Math.min(10, Math.round(evaluationResult.overallScore))
     );
 
     if (
@@ -124,16 +168,22 @@ Provide only valid JSON, no additional text.
     ) {
       evaluationResult.coverLetterScore = Math.max(
         0,
-        Math.min(10, evaluationResult.coverLetterScore)
+        Math.min(10, Math.round(evaluationResult.coverLetterScore))
       );
     }
+
+    console.log('CV evaluation completed successfully:', {
+      resumeScore: evaluationResult.resumeScore,
+      coverLetterScore: evaluationResult.coverLetterScore,
+      overallScore: evaluationResult.overallScore
+    });
 
     return evaluationResult;
   } catch (error) {
     console.error("Error evaluating CV with Gemini:", error);
 
     // Return fallback scores if Gemini fails
-    return {
+    const fallbackResult: CVEvaluationResult = {
       resumeScore: 6,
       coverLetterScore: data.coverLetter ? 6 : undefined,
       overallScore: 6,
@@ -154,6 +204,9 @@ Provide only valid JSON, no additional text.
       feedback:
         "Automatic evaluation was not successful. This application requires manual review by the hiring team to properly assess the candidate's qualifications and fit for the position.",
     };
+    
+    console.log('Using fallback evaluation result');
+    return fallbackResult;
   }
 }
 

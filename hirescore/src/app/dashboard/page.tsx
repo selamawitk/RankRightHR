@@ -2,58 +2,58 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentUser, signOut } from "@/lib/auth-client";
-import type { AuthUser } from "@/types/auth";
 import {
-  Plus,
-  Briefcase,
+  PlusCircle,
   Users,
-  LogOut,
-  User,
-  BarChart3,
-  Building,
-  MapPin,
   Calendar,
+  TrendingUp,
+  Eye,
+  Building,
+  Briefcase,
   Clock,
-  Star,
+  MapPin,
+  Star
 } from "lucide-react";
-import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth-client";
 
-interface DashboardStats {
-  activeJobs: number;
-  totalApplications: number;
-  pendingApplications: number;
-  hiredThisMonth: number;
-}
-
-interface Job {
+interface AuthUser {
   id: string;
-  title: string;
-  status: string;
-  createdAt: string;
-  applicationsCount: number;
-  type: string;
-  location?: string;
-}
-
-interface RecentApplication {
-  id: string;
-  candidateName: string;
-  candidateEmail: string;
-  jobTitle: string;
-  status: string;
-  createdAt: string;
-  overallScore?: number;
-  resumeScore?: number;
-  coverLetterScore?: number;
+  email: string;
+  name: string;
+  role: string;
+  companyName?: string | null;
 }
 
 interface DashboardData {
-  stats: DashboardStats;
-  jobs: Job[];
-  recentApplications: RecentApplication[];
+  stats: {
+    activeJobs: number;
+    totalApplications: number;
+    pendingApplications: number;
+    hiredThisMonth: number;
+  };
+  jobs: Array<{
+    id: string;
+    title: string;
+    status: string;
+    createdAt: string;
+    applicationsCount: number;
+    type: string;
+    location?: string;
+  }>;
+  recentApplications: Array<{
+    id: string;
+    candidateName: string;
+    candidateEmail: string;
+    jobTitle: string;
+    status: string;
+    createdAt: string;
+    overallScore?: number;
+    resumeScore?: number;
+    coverLetterScore?: number;
+  }>;
 }
 
 export default function DashboardPage() {
@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const checkAuthAndFetchData = async () => {
       try {
         const currentUser = await getCurrentUser();
         if (!currentUser) {
@@ -72,10 +72,9 @@ export default function DashboardPage() {
         }
         setUser(currentUser);
         
-        // Fetch dashboard data
-        if (currentUser.role === 'EMPLOYER') {
-          const response = await fetch('/api/dashboard', {
-            credentials: 'include'
+        if (currentUser.role === "EMPLOYER") {
+          const response = await fetch("/api/dashboard", {
+            credentials: "include",
           });
           if (response.ok) {
             const data = await response.json();
@@ -90,23 +89,14 @@ export default function DashboardPage() {
       }
     };
 
-    checkAuth();
+    checkAuthAndFetchData();
   }, [router]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error("Sign out failed:", error);
-    }
-  };
-
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
       month: "short",
       day: "numeric",
-      year: "numeric",
     });
   };
 
@@ -116,16 +106,29 @@ export default function DashboardPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case "ACTIVE":
+        return "bg-green-100 text-green-800";
+      case "PAUSED":
+        return "bg-yellow-100 text-yellow-800";
+      case "CLOSED":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getApplicationStatusColor = (status: string) => {
+    switch (status) {
       case "PENDING":
         return "bg-yellow-100 text-yellow-800";
-      case "REVIEWED":
+      case "REVIEWING":
         return "bg-blue-100 text-blue-800";
-      case "SHORTLISTED":
+      case "INTERVIEWED":
+        return "bg-purple-100 text-purple-800";
+      case "HIRED":
         return "bg-green-100 text-green-800";
       case "REJECTED":
         return "bg-red-100 text-red-800";
-      case "HIRED":
-        return "bg-purple-100 text-purple-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -142,273 +145,231 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm">Loading...</p>
+          <p className="text-gray-600 text-sm">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // Will redirect
+    return null;
+  }
+
+  if (user.role !== "EMPLOYER") {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-black mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">Only employers can access the dashboard.</p>
+          <Link href="/">
+            <Button className="bg-black text-white hover:bg-gray-800">
+              Go Home
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-gray-100">
+      <div className="border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="text-xl font-semibold text-black">
-              HireScore
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3 text-sm">
-                <User className="h-4 w-4 text-gray-400" />
-                <div className="flex flex-col">
-                  <span className="text-gray-900">
-                    {user.name || user.email}
-                  </span>
-                  {user.role === "EMPLOYER" && user.companyName && (
-                    <span className="text-xs text-gray-500 flex items-center gap-1">
-                      <Building className="h-3 w-3" />
-                      {user.companyName}
-                    </span>
-                  )}
-                </div>
-                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full lowercase">
-                  {user.role.toLowerCase()}
-                </span>
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Building className="h-6 w-6 text-gray-600" />
+              <div>
+                <h1 className="text-xl font-semibold text-black">
+                  {user.companyName || user.name}
+                </h1>
+                <p className="text-sm text-gray-600">Employer Dashboard</p>
               </div>
-              <Button
-                variant="ghost"
-                onClick={handleSignOut}
-                className="text-gray-600 hover:text-black h-8 px-3"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign out
-              </Button>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/jobs/create">
+                <Button className="bg-black text-white hover:bg-gray-800 rounded-md h-10 px-4">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Create Job
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-8">
-        {/* Welcome Section */}
-        <div className="py-12 border-b border-gray-100">
-          <h1 className="text-3xl font-bold text-black mb-3">
-            Welcome back, {user.name?.split(" ")[0] || "User"}
-          </h1>
-          <p className="text-gray-600 text-lg">
-            {user.role === "EMPLOYER"
-              ? `Manage your job postings and review applications${
-                  user.companyName ? ` for ${user.companyName}` : ""
-                }.`
-              : "Discover new opportunities and track your applications."}
-          </p>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="py-12">
-          {user.role === "EMPLOYER" ? (
-            <div className="grid lg:grid-cols-3 gap-8">
-              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <Plus className="h-5 w-5 text-black" />
+      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+        {/* Statistics */}
+        {dashboardData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Active Jobs</p>
+                  <p className="text-3xl font-bold text-black">{dashboardData.stats.activeJobs}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  Post new job
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Create a new job posting to attract qualified candidates.
-                </p>
-                <Link href="/jobs/create">
-                  <Button className="bg-black text-white hover:bg-gray-800 rounded-md h-9 px-4 text-sm">
-                    Create job
-                  </Button>
-                </Link>
+                <Briefcase className="h-8 w-8 text-blue-600" />
               </div>
+            </div>
 
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <Briefcase className="h-5 w-5 text-black" />
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Applications</p>
+                  <p className="text-3xl font-bold text-black">{dashboardData.stats.totalApplications}</p>
                 </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  Active jobs
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Manage your current job postings and view their performance.
-                </p>
-                
-                {dashboardData && dashboardData.jobs.length > 0 ? (
-                  <div className="space-y-3">
-                    {dashboardData.jobs.slice(0, 3).map((job) => (
-                      <div key={job.id} className="border border-gray-100 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm text-black">{job.title}</h4>
-                          <Badge variant={job.status === 'ACTIVE' ? 'default' : 'secondary'} className="text-xs">
-                            {job.status}
+                <Users className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Pending Review</p>
+                  <p className="text-3xl font-bold text-black">{dashboardData.stats.pendingApplications}</p>
+                </div>
+                <Clock className="h-8 w-8 text-yellow-600" />
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Hired This Month</p>
+                  <p className="text-3xl font-bold text-black">{dashboardData.stats.hiredThisMonth}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-600" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Jobs */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-black">Your Job Posts</h2>
+              <Link href="/jobs/create">
+                <Button variant="outline" className="border-gray-200 text-black hover:bg-gray-50 h-9 px-3">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  New Job
+                </Button>
+              </Link>
+            </div>
+
+            {dashboardData?.jobs && dashboardData.jobs.length > 0 ? (
+              <div className="space-y-4">
+                {dashboardData.jobs.slice(0, 5).map((job) => (
+                  <Link 
+                    key={job.id} 
+                    href={`/jobs/${job.id}/applicants`}
+                    className="block border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-black">{job.title}</h3>
+                          <Badge className={`${getStatusColor(job.status)} border-0 text-xs`}>
+                            {job.status.toLowerCase()}
                           </Badge>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{job.applicationsCount} applications</span>
-                          <span>{formatDate(job.createdAt)}</span>
-                        </div>
-                      </div>
-                    ))}
-                    {dashboardData.jobs.length > 3 && (
-                      <p className="text-xs text-gray-500 text-center pt-2">
-                        And {dashboardData.jobs.length - 3} more jobs...
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-gray-500 text-sm">No active jobs</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <Users className="h-5 w-5 text-black" />
-                </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  Recent Applications
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Review and manage candidate applications with AI insights.
-                </p>
-                
-                {dashboardData && dashboardData.recentApplications.length > 0 ? (
-                  <div className="space-y-3">
-                    {dashboardData.recentApplications.slice(0, 3).map((app) => (
-                      <div key={app.id} className="border border-gray-100 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-sm text-black">{app.candidateName}</h4>
-                          <Badge className={`text-xs ${getStatusColor(app.status)}`}>
-                            {app.status}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-600">{app.jobTitle}</span>
-                          {app.overallScore && (
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(job.createdAt)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatJobType(job.type)}
+                          </div>
+                          {job.location && (
                             <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3 text-yellow-400" />
-                              <span className={`text-xs font-medium ${getScoreColor(app.overallScore)}`}>
-                                {app.overallScore}/10
-                              </span>
+                              <MapPin className="h-3 w-3" />
+                              {job.location}
                             </div>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{formatDate(app.createdAt)}</p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-gray-500 text-sm">No applications yet</p>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-black">{job.applicationsCount}</div>
+                        <div className="text-xs text-gray-600">applications</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {dashboardData.jobs.length === 0 && (
+                  <div className="text-center py-8">
+                    <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-black mb-2">No jobs posted yet</h3>
+                    <p className="text-gray-600 mb-4">Create your first job posting to start receiving applications.</p>
+                    <Link href="/jobs/create">
+                      <Button className="bg-black text-white hover:bg-gray-800">
+                        Create Your First Job
+                      </Button>
+                    </Link>
                   </div>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="grid lg:grid-cols-3 gap-8">
-              <div className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <Briefcase className="h-5 w-5 text-black" />
-                </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  Browse jobs
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Discover new opportunities that match your skills and
-                  interests.
-                </p>
-                <Link href="/jobs">
-                  <Button className="bg-black text-white hover:bg-gray-800 rounded-md h-9 px-4 text-sm">
-                    View jobs
+            ) : (
+              <div className="text-center py-8">
+                <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-black mb-2">No jobs posted yet</h3>
+                <p className="text-gray-600 mb-4">Create your first job posting to start receiving applications.</p>
+                <Link href="/jobs/create">
+                  <Button className="bg-black text-white hover:bg-gray-800">
+                    Create Your First Job
                   </Button>
                 </Link>
               </div>
+            )}
+          </div>
 
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <BarChart3 className="h-5 w-5 text-black" />
-                </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  My applications
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Track your job applications and view AI feedback.
-                </p>
-                <div className="text-center py-6">
-                  <p className="text-gray-500 text-sm">No applications yet</p>
-                </div>
-              </div>
+          {/* Recent Applications */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-black">Recent Applications</h2>
+            </div>
 
-              <div className="border border-gray-200 rounded-lg p-6">
-                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-                  <User className="h-5 w-5 text-black" />
-                </div>
-                <h3 className="text-lg font-semibold text-black mb-2">
-                  Profile
-                </h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Update your profile information and preferences.
-                </p>
-                <Button
-                  variant="outline"
-                  className="border-gray-200 text-black hover:bg-gray-50 rounded-md h-9 px-4 text-sm"
-                >
-                  Edit profile
-                </Button>
+            {dashboardData?.recentApplications && dashboardData.recentApplications.length > 0 ? (
+              <div className="space-y-4">
+                {dashboardData.recentApplications.map((application) => (
+                  <div key={application.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="font-semibold text-black">{application.candidateName}</h4>
+                        <p className="text-sm text-gray-600">{application.jobTitle}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge className={`${getApplicationStatusColor(application.status)} border-0 text-xs mb-1`}>
+                          {application.status.toLowerCase().replace('_', ' ')}
+                        </Badge>
+                        {application.overallScore && (
+                          <div className="flex items-center gap-1 justify-end">
+                            <Star className="h-3 w-3 text-yellow-500" />
+                            <span className={`text-sm font-medium ${getScoreColor(application.overallScore)}`}>
+                              {application.overallScore}/10
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-600">
+                      <span>{application.candidateEmail}</span>
+                      <span>{formatDate(application.createdAt)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        <div className="py-12 border-t border-gray-100">
-          <h2 className="text-xl font-semibold text-black mb-8">
-            Overview
-          </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">
-                {dashboardData?.stats?.activeJobs || 0}
+            ) : (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-black mb-2">No applications yet</h3>
+                <p className="text-gray-600">Applications will appear here when candidates apply to your jobs.</p>
               </div>
-              <div className="text-sm text-gray-600">
-                {user.role === "EMPLOYER" ? "Active jobs" : "Applications sent"}
-              </div>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">
-                {dashboardData?.stats?.totalApplications || 0}
-              </div>
-              <div className="text-sm text-gray-600">
-                {user.role === "EMPLOYER" ? "Total applications" : "Responses received"}
-              </div>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">
-                {dashboardData?.stats?.pendingApplications || 0}
-              </div>
-              <div className="text-sm text-gray-600">
-                {user.role === "EMPLOYER" ? "Pending review" : "In progress"}
-              </div>
-            </div>
-            <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">
-                {dashboardData?.stats?.hiredThisMonth || 0}
-              </div>
-              <div className="text-sm text-gray-600">
-                {user.role === "EMPLOYER" ? "Hired this month" : "Interviews"}
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

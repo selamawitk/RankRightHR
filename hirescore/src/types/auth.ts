@@ -12,3 +12,4 @@ export type AuthSession = {
   token: string;
   expiresAt: Date;
 };
+ 

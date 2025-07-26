@@ -145,9 +145,6 @@ export default function ApplyJobPage({
       if (file.type === "text/plain") {
         const text = await file.text();
         setFormData((prev) => ({ ...prev, resumeText: text }));
-      } else {
-        // For PDF/DOC files, we'll need the user to paste the content manually for now
-        setFormData((prev) => ({ ...prev, resumeText: "" }));
       }
     }
   };
@@ -180,8 +177,7 @@ export default function ApplyJobPage({
   const validateForm = () => {
     if (!formData.candidateName.trim()) return "Name is required";
     if (!formData.candidateEmail.trim()) return "Email is required";
-    if (!formData.resumeText.trim() && !formData.resumeFile)
-      return "Resume is required";
+    if (!formData.resumeFile) return "Please upload your resume";
 
     // Check required custom questions
     if (job?.questions) {
@@ -476,10 +472,10 @@ export default function ApplyJobPage({
                   htmlFor="resumeFile"
                   className="text-sm font-medium text-black"
                 >
-                  Upload Resume
+                  Upload Resume *
                 </Label>
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <input
                     id="resumeFile"
                     type="file"
@@ -487,46 +483,35 @@ export default function ApplyJobPage({
                     onChange={handleFileChange}
                     className="hidden"
                     disabled={isSubmitting}
+                    required
                   />
                   <Label htmlFor="resumeFile" className="cursor-pointer">
-                    <span className="text-black font-medium">
-                      Click to upload
+                    <span className="text-black font-medium text-lg">
+                      Click to upload your resume
                     </span>
-                    <span className="text-gray-600"> or drag and drop</span>
+                    <br />
+                    <span className="text-gray-600">or drag and drop</span>
                   </Label>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-500 mt-2">
                     PDF, DOC, DOCX up to 10MB
                   </p>
                   {formData.resumeFile && (
-                    <p className="text-sm text-green-600 mt-2">
-                      <FileText className="h-4 w-4 inline mr-1" />
-                      {formData.resumeFile.name}
-                    </p>
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-center gap-2">
+                        <FileText className="h-5 w-5 text-green-600" />
+                        <span className="text-green-800 font-medium">
+                          {formData.resumeFile.name}
+                        </span>
+                      </div>
+                      <p className="text-green-600 text-sm mt-1">
+                        {(formData.resumeFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label
-                  htmlFor="resumeText"
-                  className="text-sm font-medium text-black"
-                >
-                  Resume Content * (Paste your CV text below)
-                </Label>
-                <Textarea
-                  id="resumeText"
-                  name="resumeText"
-                  required
-                  value={formData.resumeText}
-                  onChange={handleInputChange}
-                  placeholder="Paste your complete CV/resume content here. Include your experience, education, skills, and achievements..."
-                  rows={12}
-                  className="border-gray-200 focus:border-black focus:ring-0"
-                  disabled={isSubmitting}
-                />
                 <p className="text-sm text-gray-500">
-                  Our AI will analyze this content to match you with the job
-                  requirements.
+                  Our AI will analyze your resume to match you with the job
+                  requirements and provide instant feedback.
                 </p>
               </div>
             </div>

@@ -170,10 +170,10 @@ enum JobStatus {
 
 enum ApplicationStatus {
   PENDING
-  REVIEWED
-  SHORTLISTED
-  REJECTED
+  REVIEWING
+  INTERVIEWED
   HIRED
+  REJECTED
 }
 
 enum QuestionType {
