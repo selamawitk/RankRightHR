@@ -1,7 +1,7 @@
-import type React from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import type React from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,12 +9,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Briefcase, Home, Users, FileText, Settings, LogOut, Plus, Search } from "lucide-react"
+} from "@/components/ui/dropdown-menu";
+import {
+  Briefcase,
+  Home,
+  Users,
+  FileText,
+  Settings,
+  LogOut,
+  Plus,
+  Search,
+} from "lucide-react";
 
 interface DashboardLayoutProps {
-  children: React.ReactNode
-  userType: "recruiter" | "candidate"
+  children: React.ReactNode;
+  userType: "recruiter" | "candidate";
 }
 
 export function DashboardLayout({ children, userType }: DashboardLayoutProps) {
@@ -23,15 +32,20 @@ export function DashboardLayout({ children, userType }: DashboardLayoutProps) {
     { href: "/recruiter/jobs", label: "My Jobs", icon: Briefcase },
     { href: "/recruiter/post-job", label: "Post Job", icon: Plus },
     { href: "/recruiter/applications", label: "Applications", icon: FileText },
-  ]
+  ];
 
   const candidateNavItems = [
     { href: "/candidate/jobs", label: "Job Board", icon: Search },
-    { href: "/candidate/applications", label: "My Applications", icon: FileText },
+    {
+      href: "/candidate/applications",
+      label: "My Applications",
+      icon: FileText,
+    },
     { href: "/candidate/profile", label: "Profile", icon: Users },
-  ]
+  ];
 
-  const navItems = userType === "recruiter" ? recruiterNavItems : candidateNavItems
+  const navItems =
+    userType === "recruiter" ? recruiterNavItems : candidateNavItems;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,10 +76,15 @@ export function DashboardLayout({ children, userType }: DashboardLayoutProps) {
             {/* User Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                <Button
+                  variant="ghost"
+                  className="relative h-8 w-8 rounded-full"
+                >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-                    <AvatarFallback>{userType === "recruiter" ? "R" : "C"}</AvatarFallback>
+                    <AvatarFallback>
+                      {userType === "recruiter" ? "R" : "C"}
+                    </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -75,7 +94,9 @@ export function DashboardLayout({ children, userType }: DashboardLayoutProps) {
                     <p className="text-sm font-medium leading-none">
                       {userType === "recruiter" ? "Recruiter" : "Candidate"}
                     </p>
-                    <p className="text-xs leading-none text-muted-foreground">user@example.com</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      user@example.com
+                    </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -94,7 +115,9 @@ export function DashboardLayout({ children, userType }: DashboardLayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </main>
     </div>
-  )
+  );
 }
