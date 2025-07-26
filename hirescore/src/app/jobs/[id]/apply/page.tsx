@@ -254,7 +254,7 @@ export default function ApplyJobPage({
         setUploadProgress(50);
       }
 
-      setEvaluationStatus("Submitting application and analyzing with AI...");
+      setEvaluationStatus("Submitting application ...");
       setUploadProgress(75);
 
       const applicationData = {
