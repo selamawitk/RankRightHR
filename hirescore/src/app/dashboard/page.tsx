@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { getCurrentUser, signOut } from "@/lib/auth-client";
 import type { AuthUser } from "@/types/auth";
 import {
@@ -13,11 +14,51 @@ import {
   User,
   BarChart3,
   Building,
+  MapPin,
+  Calendar,
+  Clock,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 
+interface DashboardStats {
+  activeJobs: number;
+  totalApplications: number;
+  pendingApplications: number;
+  hiredThisMonth: number;
+}
+
+interface Job {
+  id: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  applicationsCount: number;
+  type: string;
+  location?: string;
+}
+
+interface RecentApplication {
+  id: string;
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  status: string;
+  createdAt: string;
+  overallScore?: number;
+  resumeScore?: number;
+  coverLetterScore?: number;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  jobs: Job[];
+  recentApplications: RecentApplication[];
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
@@ -30,6 +71,17 @@ export default function DashboardPage() {
           return;
         }
         setUser(currentUser);
+        
+        // Fetch dashboard data
+        if (currentUser.role === 'EMPLOYER') {
+          const response = await fetch('/api/dashboard', {
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setDashboardData(data);
+          }
+        }
       } catch (error) {
         console.error("Auth check failed:", error);
         router.push("/auth/login");
@@ -47,6 +99,42 @@ export default function DashboardPage() {
     } catch (error) {
       console.error("Sign out failed:", error);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const formatJobType = (type: string) => {
+    return type.replace("_", " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return "bg-yellow-100 text-yellow-800";
+      case "REVIEWED":
+        return "bg-blue-100 text-blue-800";
+      case "SHORTLISTED":
+        return "bg-green-100 text-green-800";
+      case "REJECTED":
+        return "bg-red-100 text-red-800";
+      case "HIRED":
+        return "bg-purple-100 text-purple-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return "text-green-600";
+    if (score >= 6) return "text-yellow-600";
+    return "text-red-600";
   };
 
   if (isLoading) {
@@ -70,7 +158,9 @@ export default function DashboardPage() {
       <header className="border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="text-xl font-semibold text-black">HireScore</div>
+            <div className="text-xl font-semibold text-black">
+              HireScore
+            </div>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3 text-sm">
                 <User className="h-4 w-4 text-gray-400" />
@@ -149,9 +239,34 @@ export default function DashboardPage() {
                 <p className="text-gray-600 mb-6 text-sm">
                   Manage your current job postings and view their performance.
                 </p>
-                <div className="text-center py-6">
-                  <p className="text-gray-500 text-sm">No active jobs</p>
-                </div>
+                
+                {dashboardData && dashboardData.jobs.length > 0 ? (
+                  <div className="space-y-3">
+                    {dashboardData.jobs.slice(0, 3).map((job) => (
+                      <div key={job.id} className="border border-gray-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm text-black">{job.title}</h4>
+                          <Badge variant={job.status === 'ACTIVE' ? 'default' : 'secondary'} className="text-xs">
+                            {job.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>{job.applicationsCount} applications</span>
+                          <span>{formatDate(job.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    {dashboardData.jobs.length > 3 && (
+                      <p className="text-xs text-gray-500 text-center pt-2">
+                        And {dashboardData.jobs.length - 3} more jobs...
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-gray-500 text-sm">No active jobs</p>
+                  </div>
+                )}
               </div>
 
               <div className="border border-gray-200 rounded-lg p-6">
@@ -159,14 +274,42 @@ export default function DashboardPage() {
                   <Users className="h-5 w-5 text-black" />
                 </div>
                 <h3 className="text-lg font-semibold text-black mb-2">
-                  Applications
+                  Recent Applications
                 </h3>
                 <p className="text-gray-600 mb-6 text-sm">
                   Review and manage candidate applications with AI insights.
                 </p>
-                <div className="text-center py-6">
-                  <p className="text-gray-500 text-sm">No applications yet</p>
-                </div>
+                
+                {dashboardData && dashboardData.recentApplications.length > 0 ? (
+                  <div className="space-y-3">
+                    {dashboardData.recentApplications.slice(0, 3).map((app) => (
+                      <div key={app.id} className="border border-gray-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm text-black">{app.candidateName}</h4>
+                          <Badge className={`text-xs ${getStatusColor(app.status)}`}>
+                            {app.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-600">{app.jobTitle}</span>
+                          {app.overallScore && (
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3 w-3 text-yellow-400" />
+                              <span className={`text-xs font-medium ${getScoreColor(app.overallScore)}`}>
+                                {app.overallScore}/10
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{formatDate(app.createdAt)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-gray-500 text-sm">No applications yet</p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -227,30 +370,38 @@ export default function DashboardPage() {
 
         {/* Stats */}
         <div className="py-12 border-t border-gray-100">
-          <h2 className="text-xl font-semibold text-black mb-8">Overview</h2>
+          <h2 className="text-xl font-semibold text-black mb-8">
+            Overview
+          </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">0</div>
+              <div className="text-2xl font-bold text-black mb-1">
+                {dashboardData?.stats?.activeJobs || 0}
+              </div>
               <div className="text-sm text-gray-600">
                 {user.role === "EMPLOYER" ? "Active jobs" : "Applications sent"}
               </div>
             </div>
             <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">0</div>
+              <div className="text-2xl font-bold text-black mb-1">
+                {dashboardData?.stats?.totalApplications || 0}
+              </div>
               <div className="text-sm text-gray-600">
-                {user.role === "EMPLOYER"
-                  ? "Total applications"
-                  : "Responses received"}
+                {user.role === "EMPLOYER" ? "Total applications" : "Responses received"}
               </div>
             </div>
             <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">0</div>
+              <div className="text-2xl font-bold text-black mb-1">
+                {dashboardData?.stats?.pendingApplications || 0}
+              </div>
               <div className="text-sm text-gray-600">
                 {user.role === "EMPLOYER" ? "Pending review" : "In progress"}
               </div>
             </div>
             <div className="border border-gray-200 rounded-lg p-6">
-              <div className="text-2xl font-bold text-black mb-1">0</div>
+              <div className="text-2xl font-bold text-black mb-1">
+                {dashboardData?.stats?.hiredThisMonth || 0}
+              </div>
               <div className="text-sm text-gray-600">
                 {user.role === "EMPLOYER" ? "Hired this month" : "Interviews"}
               </div>

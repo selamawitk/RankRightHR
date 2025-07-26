@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   Clock,
   Building,
   FileText,
+  Loader2,
 } from "lucide-react";
 
 interface Job {
@@ -52,12 +53,19 @@ interface ApplicationData {
   questionAnswers: Record<string, string>;
 }
 
-export default function ApplyJobPage({ params }: { params: { id: string } }) {
+export default function ApplyJobPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const resolvedParams = use(params);
   const [job, setJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [evaluationStatus, setEvaluationStatus] = useState("");
   const router = useRouter();
 
   const [formData, setFormData] = useState<ApplicationData>({
@@ -75,7 +83,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchJob = async () => {
       try {
-        const response = await fetch(`/api/jobs/${params.id}`);
+        const response = await fetch(`/api/jobs/${resolvedParams.id}`);
         if (response.ok) {
           const jobData = await response.json();
           setJob(jobData);
@@ -91,7 +99,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
     };
 
     fetchJob();
-  }, [params.id]);
+  }, [resolvedParams.id]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -110,15 +118,56 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, resumeFile: file }));
+      // Validate file type and size
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        setError("Please upload a PDF, DOC, or DOCX file");
+        return;
+      }
 
-      // For MVP, we'll ask user to paste CV text
-      // In production, you'd implement PDF parsing
-      setFormData((prev) => ({ ...prev, resumeText: "" }));
+      if (file.size > 10 * 1024 * 1024) {
+        // 10MB limit
+        setError("File size must be less than 10MB");
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, resumeFile: file }));
+      setError("");
+
+      // Extract text from file (basic implementation)
+      if (file.type === "text/plain") {
+        const text = await file.text();
+        setFormData((prev) => ({ ...prev, resumeText: text }));
+      } else {
+        // For PDF/DOC files, we'll need the user to paste the content manually for now
+        setFormData((prev) => ({ ...prev, resumeText: "" }));
+      }
     }
+  };
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("jobId", resolvedParams.id);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("File upload failed");
+    }
+
+    const result = await response.json();
+    return result.fileUrl;
   };
 
   const formatJobType = (type: string) => {
@@ -160,17 +209,29 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
 
     setIsSubmitting(true);
     setError("");
+    setEvaluationStatus("Preparing application...");
 
     try {
-      // For MVP, we'll send resume text directly
-      // In production, you'd handle file upload properly
+      let resumeUrl = "text-resume";
+
+      // Upload file if provided
+      if (formData.resumeFile) {
+        setEvaluationStatus("Uploading resume...");
+        setUploadProgress(25);
+        resumeUrl = await uploadFile(formData.resumeFile);
+        setUploadProgress(50);
+      }
+
+      setEvaluationStatus("Submitting application and analyzing with AI...");
+      setUploadProgress(75);
+
       const applicationData = {
-        jobId: params.id,
+        jobId: resolvedParams.id,
         candidateName: formData.candidateName,
         candidateEmail: formData.candidateEmail,
         candidatePhone: formData.candidatePhone,
         resumeText: formData.resumeText,
-        resumeUrl: "text-resume", // Placeholder for MVP
+        resumeUrl: resumeUrl,
         githubUrl: formData.githubUrl || undefined,
         websiteUrl: formData.websiteUrl || undefined,
         coverLetter: formData.coverLetter || undefined,
@@ -185,14 +246,19 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
         body: JSON.stringify(applicationData),
       });
 
+      setUploadProgress(100);
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to submit application");
       }
 
+      const result = await response.json();
+
       setSuccess(
-        "Application submitted successfully! You will be contacted if selected."
+        `Application submitted successfully! Your application has been evaluated by AI and sent to the employer. Application ID: ${result.applicationId}`
       );
+      setEvaluationStatus("");
 
       // Clear form
       setFormData({
@@ -210,8 +276,10 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
       setError(
         err instanceof Error ? err.message : "Failed to submit application"
       );
+      setEvaluationStatus("");
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -309,6 +377,28 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
             </Alert>
           )}
 
+          {/* Evaluation Status */}
+          {evaluationStatus && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  {evaluationStatus}
+                  {uploadProgress > 0 && (
+                    <div className="mt-2">
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                </AlertDescription>
+              </div>
+            </Alert>
+          )}
+
           {/* Personal Information */}
           <div className="space-y-6">
             <h3 className="text-xl font-semibold text-black">
@@ -331,6 +421,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   onChange={handleInputChange}
                   placeholder="Your full name"
                   className="h-10 border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -350,6 +441,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   onChange={handleInputChange}
                   placeholder="your.email@example.com"
                   className="h-10 border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -368,6 +460,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   onChange={handleInputChange}
                   placeholder="+1 (555) 123-4567"
                   className="h-10 border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -383,7 +476,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   htmlFor="resumeFile"
                   className="text-sm font-medium text-black"
                 >
-                  Upload Resume (Optional)
+                  Upload Resume
                 </Label>
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
                   <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
@@ -393,6 +486,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                     accept=".pdf,.doc,.docx"
                     onChange={handleFileChange}
                     className="hidden"
+                    disabled={isSubmitting}
                   />
                   <Label htmlFor="resumeFile" className="cursor-pointer">
                     <span className="text-black font-medium">
@@ -428,6 +522,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   placeholder="Paste your complete CV/resume content here. Include your experience, education, skills, and achievements..."
                   rows={12}
                   className="border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
                 <p className="text-sm text-gray-500">
                   Our AI will analyze this content to match you with the job
@@ -459,6 +554,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   onChange={handleInputChange}
                   placeholder="https://github.com/username"
                   className="h-10 border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -477,6 +573,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                   onChange={handleInputChange}
                   placeholder="https://yourportfolio.com"
                   className="h-10 border-gray-200 focus:border-black focus:ring-0"
+                  disabled={isSubmitting}
                 />
               </div>
             </div>
@@ -496,6 +593,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                 placeholder="Tell us why you're interested in this position and what makes you a great fit..."
                 rows={6}
                 className="border-gray-200 focus:border-black focus:ring-0"
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -526,6 +624,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                         placeholder="Your answer..."
                         className="h-10 border-gray-200 focus:border-black focus:ring-0"
                         required={question.required}
+                        disabled={isSubmitting}
                       />
                     )}
 
@@ -539,6 +638,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                         rows={4}
                         className="border-gray-200 focus:border-black focus:ring-0"
                         required={question.required}
+                        disabled={isSubmitting}
                       />
                     )}
 
@@ -551,6 +651,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                           }
                           className="h-10 w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0"
                           required={question.required}
+                          disabled={isSubmitting}
                         >
                           <option value="">Select an option...</option>
                           {JSON.parse(question.options).map(
@@ -571,6 +672,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                         }
                         className="h-10 w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0"
                         required={question.required}
+                        disabled={isSubmitting}
                       >
                         <option value="">Select...</option>
                         <option value="Yes">Yes</option>
@@ -588,6 +690,7 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
                         placeholder="Enter number..."
                         className="h-10 border-gray-200 focus:border-black focus:ring-0"
                         required={question.required}
+                        disabled={isSubmitting}
                       />
                     )}
                   </div>
@@ -602,16 +705,22 @@ export default function ApplyJobPage({ params }: { params: { id: string } }) {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-black text-white hover:bg-gray-800 rounded-md h-10 px-8"
+                className="bg-black text-white hover:bg-gray-800 rounded-md h-10 px-8 disabled:opacity-50"
               >
-                {isSubmitting
-                  ? "Submitting Application..."
-                  : "Submit Application"}
+                {isSubmitting ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Processing Application...
+                  </div>
+                ) : (
+                  "Submit Application"
+                )}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/jobs")}
+                disabled={isSubmitting}
                 className="border-gray-200 text-black hover:bg-gray-50 rounded-md h-10 px-8"
               >
                 Cancel
